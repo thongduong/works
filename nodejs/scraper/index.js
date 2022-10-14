@@ -1,107 +1,62 @@
 const puppeteer = require("puppeteer");
+const validator = require("validator");
+const scrapedDomain = "shopee.vn";
+const scrapedURL = `https://${scrapedDomain}/`;
+const patternDetail =
+  "https?://[a-zA-Z0-9][a-zA-Z0-9-.]+.[a-zA-Z]{2,3}/?.*-i.(.*)[0-9]+.[0-9]+\\?.*$";
+const isSameDomain = (domain, url) => {
+  return url.includes(domain);
+};
+const parseURL = (domain, url, patternDetail) => {
+  if (!isSameDomain(domain, url)) return [false, false];
+  let matchResult = url.match(patternDetail);
+  console.log(url);
+  return Array.isArray(matchResult) && matchResult.length
+    ? matchResult
+    : [false, false];
+};
 
-(async () => {
-  let url = "https://shopee.vn/";
-  const browser = await puppeteer.launch();
+const scraping = async (url) => {
+  const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
   await page.goto(url);
-  page.waitForSelector("#main");
-  const result = await page.evaluate(() => {
-    const elements = document.querySelectorAll("a");
-    // do something with elements, like mapping elements to an attribute:
-    return Array.from(elements).map((element) => element.href);
+  await page.waitForSelector("section", { timeout: 0 });
+  await page.click("body", {
+    delay: 3000,
+    button: puppeteer.Mouse,
   });
-  console.log(result);
-  // page
-  //   .eval(() => {
-  //     let element = document.querySelector("a");
-  //     return element.innerText;
-  //   })
-  //   .then((text) => {
-  //     console.log(text);
-  //   });
-
-  // const elementHandle = await page.$$("a");
-  // console.log(elementHandle);
-  // elementHandle.forEach((el) => {
-  //   el.evaluate((domElement) => {
-  //     console.log(domElement);
-  //   });
+  await page.mouse.down();
+  await page.mouse.down();
+  await page.mouse.down();
+  await page.waitForSelector(
+    "section.stardust-tabs-panels__panel > div > div > a",
+    {
+      timeout: 0,
+    }
+  );
+  // await page.waitForSelector(".home-popup", { visible: true });
+  // await page.waitForSelector("#main", {
+  //   timeout: 0,
   // });
-  // console.log(getAtag);
-  // console.log(getAtag);
-  // const getInnerHTMLProperty = await getAtag.getProperty("href");
-  // const getPtagValues = await getInnerHTMLProperty.jsonValue();
-  // console.log(getPtagValues);
-
-  // .then(() => console.log("First URL with image: " + url));
-  // for (currentURL of [
-  //   "https://example.com",
-  //   "https://google.com",
-  //   // "https://bbc.com",
-  // ]) {
-  //   await page.goto(currentURL);
-  // }
-  // console.log(`Navigating to ${url}...`);
-  // // Navigate to the selected page
-  // await page.goto(url);
-  // // page.waitFor(7000);
-  // // Wait for the required DOM to be rendered
-  // await page.waitForSelector(".section-recommend-products-wrapper");
-  // await page.$("div").forEach((el) => {
-  //   console.log(el);
-  // });
-  // const doc = await page.evaluate(() => document);
-  // console.log(doc);
-
-  // Get the link to all the required books
-  // let urls = await page.$$eval(
-  //   ".stardust-tabs-panels section.stardust-tabs-panels__panel a",
-  //   (links) => {
-  //     // Make sure the book to be scraped is in stock
-  //     // links = links.filter(
-  //     //   (link) =>
-  //     //     link.querySelector(".instock.availability > i").textContent !==
-  //     //     "In stock"
-  //     // );
-  //     // Extract the links from the data
-  //     // links = links.map((el) => el.querySelector("h3 > a").href);
-  //     links = links.map((el) => el?.href);
-  //     return links;
-  //   }
-  // );
-  // console.log(urls);
-
-  // await page.goto(url);
-  // await page.waitForSelector("body");
-
-  // // await page.$("a").forEach((el) => {
-  // //   console.log(el);
-  // // });
-  // // const body = await page.evaluate(() => {
-  // //   const hrefElement = document.querySelector("body");
-  // //   console.log(hrefElement);
-  // //   return hrefElement;
-  // // });
-  // // console.log(body);
-
-  // let urls = await page.$$eval("body", (links) => {
-  //   // Make sure the book to be scraped is in stock
-  //   // links = links.filter(link => link.querySelector('.instock.availability > i').textContent !== "In stock")
-  //   // // Extract the links from the data
-  //   // links = links.map(el => el.querySelector('h3 > a').href)
-  //   return links;
-  // });
-  // console.log(urls);
+  let result = await page.evaluate(() => {
+    // await window.scrollTo(0, window.document.body.scrollHeight);
+    return [...document.links].map((l) => l.href);
+  });
+  result = result.filter((l) => {
+    return validator.isURL(l) && isSameDomain(scrapedDomain, l);
+  });
+  // console.log(result);
+  result.forEach(async (url) => {
+    // console.log(`${url}`);
+    let [matchedURL, parsedID] = await parseURL(
+      scrapedDomain,
+      url,
+      patternDetail
+    );
+    parsedID && console.log(`${parsedID}: ${url}`);
+    // await scraping(url);
+  });
 
   await browser.close();
-})();
-
-// const browserObject = require("./browser");
-// const scraperController = require("./pageController");
-
-// //Start the browser and create a browser instance
-// let browserInstance = browserObject.startBrowser();
-
-// // Pass the browser instance to the scraper controller
-// scraperController(browserInstance);
+};
+scraping(scrapedURL);
