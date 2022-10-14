@@ -1,62 +1,66 @@
 const puppeteer = require("puppeteer");
 const validator = require("validator");
+const fs = require("fs");
+const dataPath = "./data/url.json";
 const scrapedDomain = "shopee.vn";
 const scrapedURL = `https://${scrapedDomain}/`;
 const patternDetail =
   "https?://[a-zA-Z0-9][a-zA-Z0-9-.]+.[a-zA-Z]{2,3}/?.*-i.(.*)[0-9]+.[0-9]+\\?.*$";
+const setViewport = {
+  width: 1920,
+  height: 1080,
+  deviceScaleFactor: 1,
+  delay: 3000,
+};
+const pageDownTry = 6;
 const isSameDomain = (domain, url) => {
   return url.includes(domain);
 };
 const parseURL = (domain, url, patternDetail) => {
   if (!isSameDomain(domain, url)) return [false, false];
   let matchResult = url.match(patternDetail);
-  console.log(url);
   return Array.isArray(matchResult) && matchResult.length
     ? matchResult
     : [false, false];
 };
 
 const scraping = async (url) => {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch();
   const page = await browser.newPage();
   await page.goto(url);
-  await page.waitForSelector("section", { timeout: 0 });
-  await page.click("body", {
+  await page.setViewport(setViewport);
+  // click login button
+  await page.click("a.navbar__link--login", {
     delay: 3000,
     button: puppeteer.Mouse,
   });
-  await page.mouse.down();
-  await page.mouse.down();
-  await page.mouse.down();
+  // press pageDown
+  for (let index = 0; index < pageDownTry; index++) {
+    await page.keyboard.press("PageDown", { delay: 1000 });
+  }
+  // wait for list product
   await page.waitForSelector(
-    "section.stardust-tabs-panels__panel > div > div > a",
-    {
-      timeout: 0,
-    }
+    "section.stardust-tabs-panels__panel > div > div > a"
   );
-  // await page.waitForSelector(".home-popup", { visible: true });
-  // await page.waitForSelector("#main", {
-  //   timeout: 0,
-  // });
   let result = await page.evaluate(() => {
-    // await window.scrollTo(0, window.document.body.scrollHeight);
     return [...document.links].map((l) => l.href);
   });
   result = result.filter((l) => {
     return validator.isURL(l) && isSameDomain(scrapedDomain, l);
   });
-  // console.log(result);
+  // try to parse URL
   result.forEach(async (url) => {
-    // console.log(`${url}`);
-    let [matchedURL, parsedID] = await parseURL(
-      scrapedDomain,
-      url,
-      patternDetail
-    );
-    parsedID && console.log(`${parsedID}: ${url}`);
-    // await scraping(url);
+    let [matchedURL, parsedID] = parseURL(scrapedDomain, url, patternDetail);
+    if (!parsedID) return;
+    writeURL([...parsedID.split(".")]);
+    console.log(`${parsedID}`);
   });
 
   await browser.close();
+};
+const writeURL = (data) => {
+  file = fs.createWriteStream(dataPath);
+  file.write(data.join(", ") + "\n");
+  file.end();
 };
 scraping(scrapedURL);
